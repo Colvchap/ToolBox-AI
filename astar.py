@@ -64,6 +64,15 @@ class GridWorld():
         valid_y = (-1 < cell_coord[1] < self.height)
         return valid_x and valid_y
 
+        pygame.display.update()
+
+    def _is_in_grid(self, cell_coord):
+        """ tells us whether cell_coord is valid and in range of the actual
+            grid dimensions """
+        valid_x = (-1 < cell_coord[0] < self.width)
+        valid_y = (-1 < cell_coord[1] < self.height)
+        return valid_x and valid_y
+
     def _is_occupied(self, cell_coord):
         try:
             actor = self.actors[cell_coord]
@@ -73,8 +82,14 @@ class GridWorld():
 
     def _add_swamp(self, mouse_pos):
         """ Adds a swamp tile in the cell that mouse_pos indicates """
-        # insert swamp code here.
-        pass
+        swamp_coord = (mouse_pos[0]//50, mouse_pos[1]//50)
+        if self._is_occupied(swamp_coord):
+            if self.actors[swamp_coord].removable:
+                self.actors.pop(swamp_coord, None)
+        elif swamp_coord != self.cake.cell_coordinates:
+            swamp = ObstacleTile(swamp_coord, self, './images/swamp.jpg',
+                                is_unpassable=False, terrain_cost=3)
+        self.actors[swamp_coord] = swamp
 
     def _add_lava(self, mouse_pos):
         """ Adds a lava tile in the cell that mouse_pos indicates """
@@ -108,6 +123,8 @@ class GridWorld():
                 elif event.type is pygame.MOUSEBUTTONDOWN:
                     if self.add_tile_type == 'lava':
                         self._add_lava(event.pos)
+                    elif self.add_tile_type == 'swamp':
+                        self._add_swamp(event.pos)
                     # insert swamp code here
                 elif event.type is pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
@@ -115,6 +132,8 @@ class GridWorld():
                         self.paul.get_path()
                     elif event.key == pygame.K_l:
                         self.add_tile_type = 'lava'
+                    elif event.key == pygame.K_s:
+                        self.add_tile_type = 'swamp'
                     # insert swamp code here
 
 
@@ -167,10 +186,10 @@ class Cell():
         return self.g_cost + self.h_cost
 
     def draw(self):
-        COST_TO_DRAW = ''
-        # COST_TO_DRAW = self.g_cost
-        # COST_TO_DRAW = self.h_cost
-        # COST_TO_DRAW = self.f_cost
+        #COST_TO_DRAW = ''
+        COST_TO_DRAW = self.g_cost
+        #COST_TO_DRAW = self.h_cost
+        #COST_TO_DRAW = self.f_cost
         line_width = 2
         rect = pygame.Rect(self.coordinates, self.dimensions)
         pygame.draw.rect(self.draw_screen, self.color, rect, line_width)
@@ -197,13 +216,27 @@ class Paul(Actor):
             open, and not in the closed list. """
         # modify directions and costs as needed
         directions = [(1, 0), (0, 1), (-1, 0), (0, -1)]
+        diagonals = [(1, 1), (-1, 1), (1, -1), (-1, -1)]
+        hops = [(2, 0), (0, 2), (-2, 0), (0, -2)]
         all_adj = [self.world._add_coords(coords, d) for d in directions]
-        in_bounds = [self.is_valid(c) for c in all_adj]
-        costs = []
+        all_diag = [self.world._add_coords(coords, d) for d in diagonals]
+        all_hops = [self.world._add_coords(coords, d) for d in hops]
+        in_bounds1 = [self.is_valid(c) for c in all_adj]
+        in_bounds2 = [self.is_valid(c) for c in all_diag]
+        in_bounds3 = [self.is_valid(c) for c in all_hops]
+        costs = []  # initializations
         open_adj = []
         for i, coord in enumerate(all_adj):
-            if(in_bounds[i]):
+            if(in_bounds1[i]):
                 costs.append(1 + self.world.get_terrain_cost(coord))
+                open_adj.append(coord)
+        for i, coord in enumerate(all_diag):
+            if (in_bounds2[i]):
+                costs.append(3 + self.world.get_terrain_cost(coord))
+                open_adj.append(coord)
+        for i, coord in enumerate(all_hops):
+            if (in_bounds3[i]):
+                costs.append(8 + self.world.get_terrain_cost(coord))
                 open_adj.append(coord)
         return open_adj, costs
 
